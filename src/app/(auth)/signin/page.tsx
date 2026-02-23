@@ -10,7 +10,15 @@ export default function SignInPage() {
         <p className="text-sm text-slate-600 dark:text-slate-300">
           Sign in to manage inventory, recipes, and AI insights.
         </p>
-        <button className="btn w-full" onClick={() => signIn("google")}>
+
+        <button
+          className="btn w-full"
+          onClick={() =>
+            signIn("google", {
+              callbackUrl: "/dashboard"
+            })
+          }
+        >
           Sign in with Google
         </button>
       </div>

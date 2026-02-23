@@ -4,6 +4,8 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 
 import { prisma } from "@/lib/prisma";
 
+type AppRole = "ADMIN" | "MANAGER" | "STAFF";
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
 
@@ -15,28 +17,31 @@ export const authOptions: NextAuthOptions = {
   ],
 
   session: { strategy: "jwt" },
+
   pages: { signIn: "/signin" },
 
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        // Force ADMIN role in DB for demo
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { role: "ADMIN" }
+        token.id = user.id;
+
+        const dbUser = await prisma.user.findUnique({
+          where: { id: user.id }
         });
 
-        token.id = user.id;
-        token.role = "ADMIN";
+        token.role = (dbUser?.role ?? "ADMIN") as AppRole;
       }
+
       return token;
     },
 
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = "ADMIN";
+        session.user.role =
+          (token.role as AppRole) ?? "ADMIN";
       }
+
       return session;
     }
   }
