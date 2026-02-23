@@ -14,63 +14,93 @@ function computeStatus(quantity: number, requested?: InventoryStatus) {
   return requested ?? "IN_STOCK";
 }
 
-function parseEnum<T extends string>(value: string | null, allowed: readonly T[]) {
+function parseEnum<T extends string>(
+  value: string | null,
+  allowed: readonly T[]
+): T | undefined {
   if (!value) return undefined;
   return allowed.includes(value as T) ? (value as T) : undefined;
 }
 
+/**
+ * GET /api/inventory
+ */
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
+
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { searchParams } = new URL(req.url);
+
   const name = searchParams.get("name");
   const category = parseEnum(searchParams.get("category"), [
     "Fruit",
     "Vegetable",
     "Other"
   ] as const);
+
   const status = parseEnum(searchParams.get("status"), [
     "IN_STOCK",
     "LOW_STOCK",
     "ORDERED",
     "DISCONTINUED"
   ] as const);
+
   const supplier = searchParams.get("supplier");
 
   const items = await prisma.inventoryItem.findMany({
     where: {
-      ...(name
-        ? { name: { contains: name, mode: "insensitive" } }
-        : undefined),
-      ...(category ? { category } : undefined),
-      ...(status ? { status } : undefined),
-      ...(supplier
-        ? { supplier: { contains: supplier, mode: "insensitive" } }
-        : undefined)
+      ...(name && {
+        name: {
+          contains: name
+        }
+      }),
+      ...(category && { category }),
+      ...(status && { status }),
+      ...(supplier && {
+        supplier: {
+          contains: supplier
+        }
+      })
     },
     include: {
-      createdBy: { select: { id: true, name: true, email: true, role: true } }
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true
+        }
+      }
     },
-    orderBy: { createdAt: "desc" }
+    orderBy: {
+      createdAt: "desc"
+    }
   });
 
   return NextResponse.json({ data: items });
 }
 
+/**
+ * POST /api/inventory
+ */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
+
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
   if (!canManageInventory(session.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await req.json();
+
   const parsed = inventoryCreateSchema.safeParse(body);
+
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid payload", details: parsed.error.flatten() },
@@ -78,7 +108,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const status = computeStatus(parsed.data.quantity, parsed.data.status as InventoryStatus);
+  const computedStatus = computeStatus(
+    parsed.data.quantity,
+    parsed.data.status as InventoryStatus
+  );
 
   const item = await prisma.inventoryItem.create({
     data: {
@@ -90,7 +123,7 @@ export async function POST(req: NextRequest) {
       sellingPrice: parsed.data.sellingPrice,
       supplier: parsed.data.supplier,
       expirationDate: new Date(parsed.data.expirationDate),
-      status,
+      status: computedStatus,
       createdById: session.user.id
     }
   });
