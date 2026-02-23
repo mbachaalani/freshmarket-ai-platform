@@ -17,7 +17,7 @@ export const inventoryUpdateSchema = inventoryCreateSchema.partial();
 export const recipeCreateSchema = z.object({
   name: z.string().min(2),
   ingredients: z.array(z.string().min(1)).min(1),
-  instructions: z.string().min(5),
+  instructions: z.string().min(1),
   cuisineType: z.string().min(2),
   prepTime: z.number().int().positive(),
   status: z.enum(["FAVORITE", "TO_TRY", "MADE"]).optional(),
